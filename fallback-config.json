@@ -2,6 +2,7 @@
   "waitAndRetryRpm": true,
   "maxWaitSeconds": 15,
   "jitterMs": 250,
-  "strictSingleProvider": true,
-  "fallbackCompression": true
+  "rotateOnlyOnDailyQuota": true,
+  "preFlightTpmCheck": true,
+  "strictSingleProvider": true
 }

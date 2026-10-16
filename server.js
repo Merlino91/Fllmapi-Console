@@ -15,21 +15,38 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'freellmapi.db');
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const MASTER_PASSWORD = process.env.CONSOLE_PASSWORD || null;
 
-// Ensure default fallback-config.json exists
+// Ensure default fallback-config.json and patch/fallback-loop.js exist in config dir
 function ensureConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    const defaultCfg = {
-      waitAndRetryRpm: true,
-      maxWaitSeconds: 15,
-      jitterMs: 250,
-      strictSingleProvider: true,
-      fallbackCompression: true,
-    };
-    try {
-      const dir = path.dirname(CONFIG_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const dir = path.dirname(CONFIG_PATH);
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+
+  const defaultCfg = {
+    waitAndRetryRpm: true,
+    maxWaitSeconds: 15,
+    jitterMs: 250,
+    rotateOnlyOnDailyQuota: true,
+    preFlightTpmCheck: true,
+    strictSingleProvider: true,
+  };
+
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultCfg, null, 2), 'utf-8');
-    } catch {}
+    }
+  } catch {}
+
+  // Also ensure /config/fallback-loop.js is populated so freellmapi can mount or copy it
+  try {
+    const localPatch = path.join(__dirname, 'patch', 'fallback-loop.js');
+    const targetPatch = path.join(dir, 'fallback-loop.js');
+    if (fs.existsSync(localPatch)) {
+      fs.copyFileSync(localPatch, targetPatch);
+      console.log('[Console Patch] fallback-loop.js sincronizzato in', targetPatch);
+    }
+  } catch (err) {
+    console.warn('[Console Patch] Impossibile copiare fallback-loop.js:', err.message);
   }
 }
 ensureConfig();
@@ -46,8 +63,9 @@ function getConfig() {
     waitAndRetryRpm: true,
     maxWaitSeconds: 15,
     jitterMs: 250,
+    rotateOnlyOnDailyQuota: true,
+    preFlightTpmCheck: true,
     strictSingleProvider: true,
-    fallbackCompression: true,
   };
 }
 
@@ -387,8 +405,9 @@ const server = http.createServer((req, res) => {
           waitAndRetryRpm: Boolean(parsed.waitAndRetryRpm ?? current.waitAndRetryRpm),
           maxWaitSeconds: Math.min(Math.max(Number(parsed.maxWaitSeconds) || 15, 1), 60),
           jitterMs: Math.min(Math.max(Number(parsed.jitterMs) || 250, 0), 2000),
+          rotateOnlyOnDailyQuota: Boolean(parsed.rotateOnlyOnDailyQuota ?? current.rotateOnlyOnDailyQuota),
+          preFlightTpmCheck: Boolean(parsed.preFlightTpmCheck ?? current.preFlightTpmCheck),
           strictSingleProvider: Boolean(parsed.strictSingleProvider ?? current.strictSingleProvider),
-          fallbackCompression: Boolean(parsed.fallbackCompression ?? current.fallbackCompression),
           updatedAt: new Date().toISOString(),
         };
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8');

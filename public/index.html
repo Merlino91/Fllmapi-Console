@@ -152,11 +152,11 @@
         <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
           <div class="pr-4 space-y-1">
             <label class="text-sm font-medium text-white flex items-center gap-1.5">
-              ⏱️ In-Place Wait & Retry (RPM)
+              ⏱️ In-Place Wait & Retry (429 RPM / TPM)
               <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Consigliato</span>
             </label>
             <p class="text-xs text-zinc-400 leading-relaxed">
-              Quando un provider restituisce 429 con un tempo di attesa breve (es. Groq o Gemini che dicono <i>"try again in 3s"</i>), il proxy attende i secondi necessari e riprova sulla <b>stessa identica chiave</b>, senza perdere il prompt in cache.
+              Quando un provider restituisce 429 con un tempo di attesa (es. Gemini che risponde <i>"retry in 15s"</i> o Groq <i>"try again in 7s"</i>), il proxy attende i secondi esatti (+ jitter) e riprova sulla <b>stessa identica chiave</b>, senza invalidare la cache del prompt.
             </p>
           </div>
           <div class="pt-1">
@@ -171,11 +171,11 @@
         <div class="flex flex-col justify-between p-4 rounded-lg bg-card/60 border border-border/60 space-y-3">
           <div class="space-y-1">
             <div class="flex justify-between items-center">
-              <label class="text-sm font-medium text-white">Tempo Massimo di Attesa (Secondi)</label>
+              <label class="text-sm font-medium text-white">Soglia Massima di Attesa (Secondi)</label>
               <span id="maxWaitValue" class="text-xs font-mono font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">15s</span>
             </div>
             <p class="text-xs text-zinc-400 leading-relaxed">
-              Se l'attesa dichiarata dal provider supera questa soglia (es. quota giornaliera esaurita), il proxy evita pause infinite e passa oltre o genera errore.
+              Se l'attesa dichiarata dal provider supera questa soglia, interrompe l'esecuzione e restituisce subito l'errore al client. Evita attese infinite e non consuma altre chiavi.
             </p>
           </div>
           <input type="range" id="maxWaitSeconds" min="2" max="60" step="1" value="15" 
@@ -183,7 +183,45 @@
             class="w-full accent-blue-500 cursor-pointer bg-zinc-700 h-1.5 rounded-lg" />
         </div>
 
-        <!-- Toggle 2: Strict Single-Provider Lock -->
+        <!-- Toggle 2: Rotazione Chiavi Solo su Quota Giornaliera -->
+        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
+          <div class="pr-4 space-y-1">
+            <label class="text-sm font-medium text-white flex items-center gap-1.5">
+              🛡️ Rotazione Chiavi Solo su Quota Giornaliera
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">Anti-Burning</span>
+            </label>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Impedisce categoricamente di ruotare chiavi per semplici rate limit al minuto (RPM/TPM). Autorizza il passaggio alla chiave successiva <b>esclusivamente in caso di quota giornaliera esaurita</b> (RPD / reset 24h).
+            </p>
+          </div>
+          <div class="pt-1">
+            <input type="checkbox" id="rotateOnlyOnDailyQuota" class="hidden switch-checkbox" />
+            <label for="rotateOnlyOnDailyQuota" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
+              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Toggle 3: Pre-Flight TPM & Contesto Check -->
+        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
+          <div class="pr-4 space-y-1">
+            <label class="text-sm font-medium text-white flex items-center gap-1.5">
+              🔍 Pre-Flight TPM & Contesto Check
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">Anti-413</span>
+            </label>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Ispezione preventiva prima dell'invio: confronta la stima token con il <span class="font-mono text-zinc-300">tpm_limit</span> registrato nel database di FreeLLMAPI. Se incompatibile, blocca subito la richiesta ed evita il 413 a vuoto.
+            </p>
+          </div>
+          <div class="pt-1">
+            <input type="checkbox" id="preFlightTpmCheck" class="hidden switch-checkbox" />
+            <label for="preFlightTpmCheck" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
+              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Toggle 4: Strict Single-Provider Lock -->
         <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
           <div class="pr-4 space-y-1">
             <label class="text-sm font-medium text-white flex items-center gap-1.5">
@@ -191,30 +229,12 @@
               <span class="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">Anti-Rimbalzo</span>
             </label>
             <p class="text-xs text-zinc-400 leading-relaxed">
-              Se la richiesta invoca un modello o provider specifico (es. <span class="font-mono text-zinc-300">google:gemini-flash</span>) e tutte le sue chiavi falliscono, <b>ferma l'esecuzione con errore 429</b> ed evita che il proxy rimbalzi a casaccio su modelli inferiori.
+              Se la richiesta invoca un modello o provider specifico e tutte le sue chiavi falliscono, <b>ferma l'esecuzione con errore 429</b> ed evita che il proxy rimbalzi su provider o modelli alternativi indesiderati.
             </p>
           </div>
           <div class="pt-1">
             <input type="checkbox" id="strictSingleProvider" class="hidden switch-checkbox" />
             <label for="strictSingleProvider" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
-              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Toggle 3: TPM Dynamic Compression -->
-        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
-          <div class="pr-4 space-y-1">
-            <label class="text-sm font-medium text-white flex items-center gap-1.5">
-              🗜️ Compressione Fallback su TPM (413)
-            </label>
-            <p class="text-xs text-zinc-400 leading-relaxed">
-              Se la richiesta viene rifiutata perché supera il limite di Token al Minuto (TPM) o la finestra di contesto del modello, compatta automaticamente il prompt e ripulisce le ridondanze prima di riprovare.
-            </p>
-          </div>
-          <div class="pt-1">
-            <input type="checkbox" id="fallbackCompression" class="hidden switch-checkbox" />
-            <label for="fallbackCompression" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
               <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
             </label>
           </div>
@@ -378,8 +398,9 @@
         document.getElementById('waitAndRetryRpm').checked = Boolean(data.waitAndRetryRpm);
         document.getElementById('maxWaitSeconds').value = data.maxWaitSeconds || 15;
         document.getElementById('maxWaitValue').innerText = (data.maxWaitSeconds || 15) + 's';
+        document.getElementById('rotateOnlyOnDailyQuota').checked = Boolean(data.rotateOnlyOnDailyQuota);
+        document.getElementById('preFlightTpmCheck').checked = Boolean(data.preFlightTpmCheck);
         document.getElementById('strictSingleProvider').checked = Boolean(data.strictSingleProvider);
-        document.getElementById('fallbackCompression').checked = Boolean(data.fallbackCompression);
       } catch (e) {
         console.error('Failed to load config:', e);
       }
@@ -393,8 +414,9 @@
       const payload = {
         waitAndRetryRpm: document.getElementById('waitAndRetryRpm').checked,
         maxWaitSeconds: parseInt(document.getElementById('maxWaitSeconds').value, 10),
+        rotateOnlyOnDailyQuota: document.getElementById('rotateOnlyOnDailyQuota').checked,
+        preFlightTpmCheck: document.getElementById('preFlightTpmCheck').checked,
         strictSingleProvider: document.getElementById('strictSingleProvider').checked,
-        fallbackCompression: document.getElementById('fallbackCompression').checked,
         jitterMs: 250
       };
 
