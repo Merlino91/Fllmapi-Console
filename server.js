@@ -65,21 +65,62 @@ try {
   } catch {}
 }
 
+function findActiveDbPath() {
+  // 1. If DB_PATH is explicitly set and exists as a file, return it
+  if (DB_PATH && fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).isFile()) {
+    return DB_PATH;
+  }
+
+  // 2. Direct candidate file paths (checking both freeapi.db and freellmapi.db)
+  const candidateFiles = [
+    DB_PATH,
+    '/app/server/data/freeapi.db',
+    '/app/server/data/freellmapi.db',
+    '/data/freeapi.db',
+    '/data/freellmapi.db',
+    path.join(__dirname, '..', 'server', 'data', 'freeapi.db'),
+    path.join(__dirname, '..', 'server', 'data', 'freellmapi.db'),
+    path.join(__dirname, 'freeapi.db'),
+    path.join(__dirname, 'freellmapi.db'),
+  ];
+  const foundFile = candidateFiles.find(p => p && fs.existsSync(p) && fs.statSync(p).isFile());
+  if (foundFile) return foundFile;
+
+  // 3. Scan candidate directories for ANY .db file (e.g. if DB_PATH was a directory or named differently)
+  const candidateDirs = [
+    DB_PATH ? (fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).isDirectory() ? DB_PATH : path.dirname(DB_PATH)) : null,
+    '/app/server/data',
+    '/data',
+  ].filter(Boolean);
+
+  for (const dir of candidateDirs) {
+    try {
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        const files = fs.readdirSync(dir);
+        console.log(`[Console DB] Ispezione cartella ${dir}:`, files);
+        const match = files.find(f => f.endsWith('.db') && !f.includes('journal') && !f.includes('wal'));
+        if (match) {
+          const matchedPath = path.join(dir, match);
+          console.log(`[Console DB] Trovato file database: ${matchedPath}`);
+          return matchedPath;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Console DB] Impossibile leggere directory ${dir}:`, e.message);
+    }
+  }
+
+  return null;
+}
+
 function getDbInstance() {
   if (!Database) {
     console.warn('[Console DB] Driver SQLite non disponibile');
     return null;
   }
-  const candidates = [
-    DB_PATH,
-    '/app/server/data/freellmapi.db',
-    '/data/freellmapi.db',
-    path.join(__dirname, '..', 'server', 'data', 'freellmapi.db'),
-    path.join(__dirname, 'freellmapi.db'),
-  ];
-  const activePath = candidates.find(p => p && fs.existsSync(p));
+  const activePath = findActiveDbPath();
   if (!activePath) {
-    console.warn('[Console DB] Database freellmapi.db non trovato nei percorsi candidati:', candidates);
+    console.warn('[Console DB] Nessun database trovato nei percorsi candidati (cercato freeapi.db / freellmapi.db)');
     return null;
   }
   try {
