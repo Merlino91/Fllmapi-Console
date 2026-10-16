@@ -1,0 +1,21 @@
+{
+  "name": "fllmapi-console",
+  "version": "1.0.0",
+  "description": "Smart Fallback Controller & Observability Console for FreeLLMAPI",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "freellmapi",
+    "llm",
+    "proxy",
+    "fallback",
+    "rate-limit",
+    "rpm",
+    "dokploy"
+  ],
+  "author": "",
+  "license": "MIT"
+}
