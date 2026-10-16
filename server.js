@@ -56,7 +56,9 @@ let Database = null;
 try {
   const sqlite = await import('node:sqlite');
   Database = sqlite.DatabaseSync;
-} catch {
+  console.log('[Console DB] Modulo nativo node:sqlite caricato con successo');
+} catch (err) {
+  console.warn('[Console DB] node:sqlite non caricabile:', err.message);
   try {
     const bSqlite = await import('better-sqlite3');
     Database = bSqlite.default;
@@ -64,19 +66,26 @@ try {
 }
 
 function getDbInstance() {
-  if (!Database) return null;
+  if (!Database) {
+    console.warn('[Console DB] Driver SQLite non disponibile');
+    return null;
+  }
   const candidates = [
     DB_PATH,
-    '/data/freellmapi.db',
     '/app/server/data/freellmapi.db',
+    '/data/freellmapi.db',
     path.join(__dirname, '..', 'server', 'data', 'freellmapi.db'),
     path.join(__dirname, 'freellmapi.db'),
   ];
-  const activePath = candidates.find(p => fs.existsSync(p));
-  if (!activePath) return null;
+  const activePath = candidates.find(p => p && fs.existsSync(p));
+  if (!activePath) {
+    console.warn('[Console DB] Database freellmapi.db non trovato nei percorsi candidati:', candidates);
+    return null;
+  }
   try {
     return new Database(activePath, { readOnly: true, readonly: true });
-  } catch {
+  } catch (err) {
+    console.error('[Console DB] Errore apertura database SQLite (' + activePath + '):', err.message);
     return null;
   }
 }
