@@ -34,207 +34,248 @@
   <style>
     body { background-color: #090a0f; color: #f3f4f6; font-family: 'Geist', sans-serif; }
     .glass-card { background: #12141c; border: 1px solid #202433; border-radius: 0.75rem; }
-    /* Custom switch toggle */
     .switch-checkbox:checked + .switch-label { background-color: #3b82f6; }
     .switch-checkbox:checked + .switch-label .switch-dot { transform: translateX(1.25rem); }
   </style>
 </head>
-<body class="min-h-screen flex flex-col p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+<body class="min-h-screen flex flex-col justify-center p-4 md:p-8">
 
-  <!-- HEADER -->
-  <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-border gap-4">
-    <div class="flex items-center space-x-3">
-      <div class="size-10 rounded-lg bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xl">
+  <!-- ==================== LOGIN SCREEN ==================== -->
+  <div id="login-view" class="w-full max-w-md mx-auto glass-card p-6 md:p-8 space-y-6 shadow-2xl">
+    <div class="text-center space-y-2">
+      <div class="size-12 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-2xl mx-auto">
         ⚡
       </div>
-      <div>
-        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-          FreeLLMAPI Controller
-          <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Sidecar v1.0</span>
-        </h1>
-        <p class="text-xs text-zinc-400">Pannello di controllo per le logiche di fallback, attesa RPM e telemetria SQLite</p>
-      </div>
+      <h1 class="text-xl font-bold tracking-tight text-white">FreeLLMAPI Console</h1>
+      <p class="text-xs text-zinc-400">Accedi con le stesse credenziali del tuo account FreeLLMAPI</p>
     </div>
 
-    <!-- Status Badges -->
-    <div class="flex items-center space-x-3">
-      <div id="db-status-badge" class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border border-border bg-card">
-        <span class="size-2 rounded-full bg-zinc-500 animate-pulse" id="db-status-dot"></span>
-        <span class="font-mono text-zinc-300" id="db-status-text">Connessione DB...</span>
+    <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+      <div id="login-error" class="hidden p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium text-center"></div>
+
+      <div class="space-y-1">
+        <label class="text-xs font-medium text-zinc-300">Email (o lascia vuoto per account unico)</label>
+        <input type="email" id="login-email" placeholder="admin@example.com" 
+          class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-border text-xs text-white focus:outline-none focus:border-blue-500 transition font-mono" />
       </div>
-      <button onclick="fetchData()" class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-hover text-xs font-medium text-zinc-300 transition flex items-center gap-1.5">
-        <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-        Aggiorna
+
+      <div class="space-y-1">
+        <label class="text-xs font-medium text-zinc-300">Password</label>
+        <input type="password" id="login-password" required placeholder="••••••••" 
+          class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-border text-xs text-white focus:outline-none focus:border-blue-500 transition font-mono" />
+      </div>
+
+      <button type="submit" id="login-btn" class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-2">
+        Accedi alla Console
       </button>
-    </div>
-  </header>
+    </form>
 
-  <!-- QUICK STATS OVERVIEW -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="glass-card p-4">
-      <div class="text-xs text-zinc-400">Chiavi Rilevate</div>
-      <div class="text-2xl font-bold mt-1 text-white font-mono" id="stat-total-keys">-</div>
-      <div class="text-[11px] text-zinc-500 mt-0.5" id="stat-healthy-keys">- attive</div>
-    </div>
-    <div class="glass-card p-4">
-      <div class="text-xs text-zinc-400">Cooldown Attivi</div>
-      <div class="text-2xl font-bold mt-1 font-mono" id="stat-active-cooldowns">-</div>
-      <div class="text-[11px] text-zinc-500 mt-0.5">chiavi temporaneamente in pausa</div>
-    </div>
-    <div class="glass-card p-4">
-      <div class="text-xs text-zinc-400">Modalità Fallback</div>
-      <div class="text-lg font-bold mt-1 text-blue-400" id="stat-mode">Smart Wait</div>
-      <div class="text-[11px] text-zinc-500 mt-0.5">Prompt cache protetta</div>
-    </div>
-    <div class="glass-card p-4">
-      <div class="text-xs text-zinc-400">Tentativi Tracciati</div>
-      <div class="text-2xl font-bold mt-1 text-white font-mono" id="stat-logged-attempts">-</div>
-      <div class="text-[11px] text-zinc-500 mt-0.5">nel registro SQLite</div>
+    <div class="text-[11px] text-zinc-500 text-center leading-relaxed">
+      🔒 Accesso protetto. I token di sessione sono cifrati e verificati in tempo reale contro il database SQLite locale.
     </div>
   </div>
 
-  <!-- MAIN CONFIGURATION SECTION -->
-  <section class="glass-card p-6 space-y-6">
-    <div class="flex items-center justify-between pb-4 border-b border-border">
-      <div>
-        <h2 class="text-base font-semibold text-white flex items-center gap-2">
-          ⚙️ Regole di Fallback & Protezione Prompt Caching
-        </h2>
-        <p class="text-xs text-zinc-400 mt-0.5">Le modifiche vengono salvate in <span class="font-mono text-zinc-300">fallback-config.json</span> e lette al volo da FreeLLMAPI.</p>
+  <!-- ==================== DASHBOARD VIEW (Nascosta fino al login) ==================== -->
+  <div id="dashboard-view" class="hidden max-w-6xl mx-auto w-full space-y-6">
+
+    <!-- HEADER -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-border gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="size-10 rounded-lg bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xl">
+          ⚡
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            FreeLLMAPI Controller
+            <span class="text-xs font-mono font-normal px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">Sidecar v1.0</span>
+          </h1>
+          <p class="text-xs text-zinc-400">Pannello di controllo per le logiche di fallback, attesa RPM e telemetria SQLite</p>
+        </div>
       </div>
-      <button id="save-btn" onclick="saveConfig()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition flex items-center gap-2">
-        Salva Regole
-      </button>
+
+      <!-- User & Status Badges -->
+      <div class="flex items-center space-x-3">
+        <div id="db-status-badge" class="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-full border border-border bg-card">
+          <span class="size-2 rounded-full bg-zinc-500 animate-pulse" id="db-status-dot"></span>
+          <span class="font-mono text-zinc-300" id="db-status-text">Connessione DB...</span>
+        </div>
+        <div class="hidden md:flex items-center space-x-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-card font-mono text-zinc-300">
+          <span>👤</span> <span id="user-display">-</span>
+        </div>
+        <button onclick="handleLogout()" class="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-rose-500/10 hover:border-rose-500/30 text-xs font-medium text-zinc-400 hover:text-rose-400 transition">
+          Esci
+        </button>
+      </div>
+    </header>
+
+    <!-- QUICK STATS OVERVIEW -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass-card p-4">
+        <div class="text-xs text-zinc-400">Chiavi Rilevate</div>
+        <div class="text-2xl font-bold mt-1 text-white font-mono" id="stat-total-keys">-</div>
+        <div class="text-[11px] text-zinc-500 mt-0.5" id="stat-healthy-keys">- attive</div>
+      </div>
+      <div class="glass-card p-4">
+        <div class="text-xs text-zinc-400">Cooldown Attivi</div>
+        <div class="text-2xl font-bold mt-1 font-mono" id="stat-active-cooldowns">-</div>
+        <div class="text-[11px] text-zinc-500 mt-0.5">chiavi temporaneamente in pausa</div>
+      </div>
+      <div class="glass-card p-4">
+        <div class="text-xs text-zinc-400">Modalità Fallback</div>
+        <div class="text-lg font-bold mt-1 text-blue-400" id="stat-mode">Smart Wait</div>
+        <div class="text-[11px] text-zinc-500 mt-0.5">Prompt cache protetta</div>
+      </div>
+      <div class="glass-card p-4">
+        <div class="text-xs text-zinc-400">Tentativi Tracciati</div>
+        <div class="text-2xl font-bold mt-1 text-white font-mono" id="stat-logged-attempts">-</div>
+        <div class="text-[11px] text-zinc-500 mt-0.5">nel registro SQLite</div>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-      <!-- Toggle 1: In-Place Wait & Retry -->
-      <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
-        <div class="pr-4 space-y-1">
-          <label class="text-sm font-medium text-white flex items-center gap-1.5">
-            ⏱️ In-Place Wait & Retry (RPM)
-            <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Consigliato</span>
-          </label>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Quando un provider restituisce 429 con un tempo di attesa breve (es. Groq o Gemini che dicono <i>"try again in 3s"</i>), il proxy attende i secondi necessari e riprova sulla <b>stessa identica chiave</b>, senza perdere il prompt in cache.
-          </p>
+    <!-- MAIN CONFIGURATION SECTION -->
+    <section class="glass-card p-6 space-y-6">
+      <div class="flex items-center justify-between pb-4 border-b border-border">
+        <div>
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            ⚙️ Regole di Fallback & Protezione Prompt Caching
+          </h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Le modifiche vengono salvate in <span class="font-mono text-zinc-300">fallback-config.json</span> e lette al volo da FreeLLMAPI.</p>
         </div>
-        <div class="pt-1">
-          <input type="checkbox" id="waitAndRetryRpm" class="hidden switch-checkbox" />
-          <label for="waitAndRetryRpm" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
-            <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
-          </label>
-        </div>
+        <button id="save-btn" onclick="saveConfig()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/20 transition flex items-center gap-2">
+          Salva Regole
+        </button>
       </div>
 
-      <!-- Slider: Max Wait Time -->
-      <div class="flex flex-col justify-between p-4 rounded-lg bg-card/60 border border-border/60 space-y-3">
-        <div class="space-y-1">
-          <div class="flex justify-between items-center">
-            <label class="text-sm font-medium text-white">Tempo Massimo di Attesa (Secondi)</label>
-            <span id="maxWaitValue" class="text-xs font-mono font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">15s</span>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Toggle 1: In-Place Wait & Retry -->
+        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
+          <div class="pr-4 space-y-1">
+            <label class="text-sm font-medium text-white flex items-center gap-1.5">
+              ⏱️ In-Place Wait & Retry (RPM)
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Consigliato</span>
+            </label>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Quando un provider restituisce 429 con un tempo di attesa breve (es. Groq o Gemini che dicono <i>"try again in 3s"</i>), il proxy attende i secondi necessari e riprova sulla <b>stessa identica chiave</b>, senza perdere il prompt in cache.
+            </p>
           </div>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Se l'attesa dichiarata dal provider supera questa soglia (es. quota giornaliera esaurita), il proxy evita pause infinite e passa oltre o genera errore.
-          </p>
+          <div class="pt-1">
+            <input type="checkbox" id="waitAndRetryRpm" class="hidden switch-checkbox" />
+            <label for="waitAndRetryRpm" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
+              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
+            </label>
+          </div>
         </div>
-        <input type="range" id="maxWaitSeconds" min="2" max="60" step="1" value="15" 
-          oninput="document.getElementById('maxWaitValue').innerText = this.value + 's'"
-          class="w-full accent-blue-500 cursor-pointer bg-zinc-700 h-1.5 rounded-lg" />
-      </div>
 
-      <!-- Toggle 2: Strict Single-Provider Lock -->
-      <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
-        <div class="pr-4 space-y-1">
-          <label class="text-sm font-medium text-white flex items-center gap-1.5">
-            🔒 Strict Single-Provider Lock
-            <span class="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">Anti-Rimbalzo</span>
-          </label>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Se la richiesta invoca un modello o provider specifico (es. <span class="font-mono text-zinc-300">google:gemini-flash</span>) e tutte le sue chiavi falliscono, <b>ferma l'esecuzione con errore 429</b> ed evita che il proxy rimbalzi a casaccio su modelli inferiori.
-          </p>
+        <!-- Slider: Max Wait Time -->
+        <div class="flex flex-col justify-between p-4 rounded-lg bg-card/60 border border-border/60 space-y-3">
+          <div class="space-y-1">
+            <div class="flex justify-between items-center">
+              <label class="text-sm font-medium text-white">Tempo Massimo di Attesa (Secondi)</label>
+              <span id="maxWaitValue" class="text-xs font-mono font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">15s</span>
+            </div>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Se l'attesa dichiarata dal provider supera questa soglia (es. quota giornaliera esaurita), il proxy evita pause infinite e passa oltre o genera errore.
+            </p>
+          </div>
+          <input type="range" id="maxWaitSeconds" min="2" max="60" step="1" value="15" 
+            oninput="document.getElementById('maxWaitValue').innerText = this.value + 's'"
+            class="w-full accent-blue-500 cursor-pointer bg-zinc-700 h-1.5 rounded-lg" />
         </div>
-        <div class="pt-1">
-          <input type="checkbox" id="strictSingleProvider" class="hidden switch-checkbox" />
-          <label for="strictSingleProvider" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
-            <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
-          </label>
+
+        <!-- Toggle 2: Strict Single-Provider Lock -->
+        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
+          <div class="pr-4 space-y-1">
+            <label class="text-sm font-medium text-white flex items-center gap-1.5">
+              🔒 Strict Single-Provider Lock
+              <span class="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">Anti-Rimbalzo</span>
+            </label>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Se la richiesta invoca un modello o provider specifico (es. <span class="font-mono text-zinc-300">google:gemini-flash</span>) e tutte le sue chiavi falliscono, <b>ferma l'esecuzione con errore 429</b> ed evita che il proxy rimbalzi a casaccio su modelli inferiori.
+            </p>
+          </div>
+          <div class="pt-1">
+            <input type="checkbox" id="strictSingleProvider" class="hidden switch-checkbox" />
+            <label for="strictSingleProvider" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
+              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Toggle 3: TPM Dynamic Compression -->
+        <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
+          <div class="pr-4 space-y-1">
+            <label class="text-sm font-medium text-white flex items-center gap-1.5">
+              🗜️ Compressione Fallback su TPM (413)
+            </label>
+            <p class="text-xs text-zinc-400 leading-relaxed">
+              Se la richiesta viene rifiutata perché supera il limite di Token al Minuto (TPM) o la finestra di contesto del modello, compatta automaticamente il prompt e ripulisce le ridondanze prima di riprovare.
+            </p>
+          </div>
+          <div class="pt-1">
+            <input type="checkbox" id="fallbackCompression" class="hidden switch-checkbox" />
+            <label for="fallbackCompression" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
+              <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- LIVE COOLDOWNS & RECENT ATTEMPTS TABS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- Active Cooldowns Table -->
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-border">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            ⏸️ Chiavi in Cooldown / Pausa
+          </h3>
+          <span id="cooldown-count" class="text-xs font-mono text-zinc-400">0 attive</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-zinc-500 border-b border-border/40 font-mono">
+                <th class="pb-2">Provider</th>
+                <th class="pb-2">Modello</th>
+                <th class="pb-2">Key ID</th>
+                <th class="pb-2 text-right">Reset tra</th>
+              </tr>
+            </thead>
+            <tbody id="cooldowns-tbody" class="divide-y divide-border/20">
+              <tr><td colspan="4" class="py-4 text-center text-zinc-500 italic">Nessuna chiave in cooldown al momento.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <!-- Toggle 3: TPM Dynamic Compression -->
-      <div class="flex items-start justify-between p-4 rounded-lg bg-card/60 border border-border/60">
-        <div class="pr-4 space-y-1">
-          <label class="text-sm font-medium text-white flex items-center gap-1.5">
-            🗜️ Compressione Fallback su TPM (413)
-          </label>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Se la richiesta viene rifiutata perché supera il limite di Token al Minuto (TPM) o la finestra di contesto del modello, compatta automaticamente il prompt e ripulisce le ridondanze prima di riprovare.
-          </p>
+      <!-- Recent Attempts Log -->
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-border">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            📜 Registro Tentativi Recenti
+          </h3>
+          <span class="text-xs font-mono text-zinc-400">Live feed SQLite</span>
         </div>
-        <div class="pt-1">
-          <input type="checkbox" id="fallbackCompression" class="hidden switch-checkbox" />
-          <label for="fallbackCompression" class="switch-label block w-11 h-6 rounded-full bg-zinc-700 cursor-pointer p-1 transition-colors">
-            <span class="switch-dot block size-4 rounded-full bg-white transition-transform"></span>
-          </label>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-zinc-500 border-b border-border/40 font-mono">
+                <th class="pb-2">Modello</th>
+                <th class="pb-2">Esito</th>
+                <th class="pb-2">Latenza</th>
+                <th class="pb-2 text-right">Data/Ora</th>
+              </tr>
+            </thead>
+            <tbody id="attempts-tbody" class="divide-y divide-border/20">
+              <tr><td colspan="4" class="py-4 text-center text-zinc-500 italic">Caricamento registro...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-    </div>
-  </section>
-
-  <!-- LIVE COOLDOWNS & RECENT ATTEMPTS TABS -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    <!-- Active Cooldowns Table -->
-    <div class="glass-card p-5 space-y-4">
-      <div class="flex items-center justify-between pb-3 border-b border-border">
-        <h3 class="text-sm font-semibold text-white flex items-center gap-2">
-          ⏸️ Chiavi in Cooldown / Pausa
-        </h3>
-        <span id="cooldown-count" class="text-xs font-mono text-zinc-400">0 attive</span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="text-zinc-500 border-b border-border/40 font-mono">
-              <th class="pb-2">Provider</th>
-              <th class="pb-2">Modello</th>
-              <th class="pb-2">Key ID</th>
-              <th class="pb-2 text-right">Reset tra</th>
-            </tr>
-          </thead>
-          <tbody id="cooldowns-tbody" class="divide-y divide-border/20">
-            <tr><td colspan="4" class="py-4 text-center text-zinc-500 italic">Nessuna chiave in cooldown al momento.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Recent Attempts Log -->
-    <div class="glass-card p-5 space-y-4">
-      <div class="flex items-center justify-between pb-3 border-b border-border">
-        <h3 class="text-sm font-semibold text-white flex items-center gap-2">
-          📜 Registro Tentativi Recenti
-        </h3>
-        <span class="text-xs font-mono text-zinc-400">Live feed SQLite</span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-          <thead>
-            <tr class="text-zinc-500 border-b border-border/40 font-mono">
-              <th class="pb-2">Modello</th>
-              <th class="pb-2">Esito</th>
-              <th class="pb-2">Latenza</th>
-              <th class="pb-2 text-right">Data/Ora</th>
-            </tr>
-          </thead>
-          <tbody id="attempts-tbody" class="divide-y divide-border/20">
-            <tr><td colspan="4" class="py-4 text-center text-zinc-500 italic">Caricamento registro...</td></tr>
-          </tbody>
-        </table>
-      </div>
     </div>
 
   </div>
@@ -245,9 +286,94 @@
   </div>
 
   <script>
+    let authToken = localStorage.getItem('fllm_console_token') || null;
+
+    function authHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      if (authToken) h['Authorization'] = `Bearer ${authToken}`;
+      return h;
+    }
+
+    async function checkAuth() {
+      if (!authToken) {
+        showLoginView();
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/me', { headers: authHeaders() });
+        const data = await res.json();
+        if (data.authenticated) {
+          showDashboardView(data.email);
+          fetchConfig();
+          fetchData();
+        } else {
+          showLoginView();
+        }
+      } catch (e) {
+        showLoginView();
+      }
+    }
+
+    function showLoginView() {
+      document.getElementById('login-view').classList.remove('hidden');
+      document.getElementById('dashboard-view').classList.add('hidden');
+      document.body.classList.add('justify-center');
+    }
+
+    function showDashboardView(email) {
+      document.getElementById('login-view').classList.add('hidden');
+      document.getElementById('dashboard-view').classList.remove('hidden');
+      document.body.classList.remove('justify-center');
+      document.getElementById('user-display').innerText = email || 'Admin';
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn');
+      errBox.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerText = 'Verifica in corso...';
+
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          authToken = data.token;
+          localStorage.setItem('fllm_console_token', authToken);
+          showDashboardView(data.email);
+          fetchConfig();
+          fetchData();
+        } else {
+          errBox.innerText = data.error || 'Credenziali non valide';
+          errBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        errBox.innerText = 'Errore di connessione: ' + err.message;
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Accedi alla Console';
+      }
+    }
+
+    function handleLogout() {
+      authToken = null;
+      localStorage.removeItem('fllm_console_token');
+      showLoginView();
+    }
+
     async function fetchConfig() {
       try {
-        const res = await fetch('/api/config');
+        const res = await fetch('/api/config', { headers: authHeaders() });
+        if (res.status === 401) return handleLogout();
         const data = await res.json();
         document.getElementById('waitAndRetryRpm').checked = Boolean(data.waitAndRetryRpm);
         document.getElementById('maxWaitSeconds').value = data.maxWaitSeconds || 15;
@@ -275,9 +401,10 @@
       try {
         const res = await fetch('/api/config', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(payload)
         });
+        if (res.status === 401) return handleLogout();
         if (res.ok) {
           showToast('Regole salvate con successo!');
         }
@@ -299,8 +426,10 @@
     }
 
     async function fetchData() {
+      if (!authToken) return;
       try {
-        const res = await fetch('/api/database');
+        const res = await fetch('/api/database', { headers: authHeaders() });
+        if (res.status === 401) return handleLogout();
         const data = await res.json();
 
         // Update DB Status badge
@@ -369,10 +498,9 @@
       }
     }
 
-    // Init & auto-refresh interval
-    fetchConfig();
-    fetchData();
-    setInterval(fetchData, 8000); // refresh every 8 seconds
+    // Start
+    checkAuth();
+    setInterval(fetchData, 8000); // refresh telemetry every 8s
   </script>
 </body>
 </html>
