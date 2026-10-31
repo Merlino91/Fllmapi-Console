@@ -2,7 +2,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import esbuild from 'esbuild';
 
-const srcFile = path.resolve('..', 'FreeLLMAPI', 'server', 'src', 'lib', 'fallback-loop.ts');
+const candidatePaths = [
+  path.resolve('..', 'freellmapi-main', 'server', 'src', 'lib', 'fallback-loop.ts'),
+  path.resolve('..', 'FreeLLMAPI', 'server', 'src', 'lib', 'fallback-loop.ts'),
+  path.resolve('..', 'freellmapi', 'server', 'src', 'lib', 'fallback-loop.ts'),
+  path.resolve('..', 'FreeLLMAPI-Old Version', 'server', 'src', 'lib', 'fallback-loop.ts'),
+];
+const srcFile = candidatePaths.find(p => fs.existsSync(p));
+if (!srcFile) {
+  console.error('[Build Error] Impossibile trovare il file sorgente fallback-loop.ts nei percorsi candidati.');
+  process.exit(1);
+}
+console.log(`[Build] Utilizzo file sorgente: ${srcFile}`);
 let content = fs.readFileSync(srcFile, 'utf8');
 
 // 1. Add fs import and getSmartFallbackConfig helper near top
@@ -41,9 +52,10 @@ content = content.replace(
   '  let lastError: any = null;\n  let initialPlatform: string | undefined;'
 );
 
+const routeRegex = /^[ \t]*route = hooks\.route\(attempt\);/m;
 content = content.replace(
-  '    route = hooks.route(attempt);',
-  `    route = hooks.route(attempt);
+  routeRegex,
+  `      route = hooks.route(attempt);
     if (attempt === 0) {
       initialPlatform = route.platform;
     } else {

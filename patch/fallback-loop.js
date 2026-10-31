@@ -23,7 +23,8 @@ function getSmartFallbackConfig() {
   };
 }
 import { nextMonthResetAt } from "../services/key-budget.js";
-import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta } from "../services/router.js";
+import { benchCloudflareAccount } from "../services/cloudflare-daily-quota.js";
+import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from "../services/router.js";
 import { safeHeaderValue } from "./header-value.js";
 import {
   recordRequest,
@@ -51,6 +52,7 @@ import {
   isProviderBadRequestError,
   isProviderDegradedError,
   isProviderLevelError,
+  isProviderMomentFailure,
   isContextTooLargeError,
   isTimeoutErrorText,
   isStreamTruncatedError
@@ -111,6 +113,7 @@ function benchKeyAcrossPlatform(route, durationMs, source, state, reason) {
   console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 6e4)}min`);
 }
 const DEFAULT_FALLBACK_TIME_BUDGET_MS = 45e3;
+const REASONING_HOLD_MAX_MS = 15e3;
 const HEDGE_BENCH_MIN_SILENT_FRACTION = 0.75;
 const FALLBACK_TIME_BUDGET_SETTING = "fallback_time_budget_ms";
 function getFallbackTimeBudgetMs() {
@@ -243,7 +246,8 @@ function recordRetryableFailure(route, err, state, now = Date.now()) {
   }
   if (isContextTooLargeError(err)) {
     learnLimitFromError(route.modelDbId, err);
-    learnContextWindowFromError(route.modelDbId, err);
+    const refusedTokens = Math.max(state.estimatedTotalTokens ?? 0, state.observedTotalTokens ?? 0, state.observedInputTokens ?? 0);
+    learnContextWindowFromError(route.modelDbId, err, refusedTokens > 0 ? refusedTokens : void 0);
     return false;
   }
   const capBefore = learnedOutputCap(route.platform, route.modelId, route.endpointScope);
@@ -259,6 +263,7 @@ function recordRetryableFailure(route, err, state, now = Date.now()) {
   if (consumeSkipBenchExemption(route, err)) return true;
   const decision = cooldownDecisionForError(route, err);
   setCooldown(route.platform, route.modelId, route.keyId, decision.durationMs, decision.source);
+  if (route.platform === "cloudflare") benchCloudflareAccount(route.apiKey, err, decision.durationMs, decision.source);
   if (isStreamTruncatedError(err)) {
     const tk = `${route.platform}:${route.modelId}:${route.keyId}`;
     const streak = (truncationStreaks.get(tk) ?? 0) + 1;
@@ -286,8 +291,11 @@ function recordRetryableFailure(route, err, state, now = Date.now()) {
   } else if (isPaymentRequiredError(err)) {
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, "is out of credits (402)");
   }
-  noteModelFailure(route, now);
-  if (!hasOtherUsableKey(route.modelDbId, route.keyId, state.skipKeys)) {
+  const providerMoment = isProviderMomentAttributionEnabled() && isProviderMomentFailure(err);
+  if (!providerMoment) {
+    noteModelFailure(route, now);
+  }
+  if (!providerMoment && !hasOtherUsableKey(route.modelDbId, route.keyId, state.skipKeys)) {
     if (isRateLimitSignal(err)) {
       recordRateLimitHit(route.modelDbId);
     } else {
@@ -833,6 +841,7 @@ export {
   MODEL_FAILURE_THRESHOLD,
   MODEL_FAILURE_WINDOW_MS,
   MODEL_NOT_FOUND_PLATFORM_LIMIT,
+  REASONING_HOLD_MAX_MS,
   TRUNCATION_BENCH_MS,
   TRUNCATION_STREAK_LIMIT,
   classifyAttemptError,
